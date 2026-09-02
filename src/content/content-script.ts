@@ -51,7 +51,49 @@ function collectFromMediaTags(): MediaInfo[] {
     const el = node as HTMLVideoElement | HTMLAudioElement | HTMLSourceElement;
     const tag = el.tagName.toLowerCase();
     const url = absoluteUrl(el.getAttribute('src'));
-    if (!url) return;
+    if (!url) {
+      // No src attribute at all. A media element that is playing, buffered,
+      // or has a duration without a src is being fed by script — i.e. an
+      // MSE (MediaSource Extensions) player like YouTube's. Report it as a
+      // streaming entry so the UI can explain, instead of silently missing
+      // it. Idle/empty placeholder elements are ignored.
+      if (tag === 'source') return;
+      const mediaEl = el as HTMLVideoElement | HTMLAudioElement;
+      const active =
+        !mediaEl.paused ||
+        mediaEl.currentTime > 0 ||
+        mediaEl.readyState >= 3 ||
+        (mediaEl.duration !== undefined &&
+          Number.isFinite(mediaEl.duration) &&
+          mediaEl.duration > 0);
+      if (!active) return;
+      const key = `no-src-${results.size}-${mediaEl.id || mediaEl.className || 'media'}`;
+      if (results.has(key)) return;
+      const durationSeconds =
+        Number.isFinite(mediaEl.duration) && mediaEl.duration > 0
+          ? mediaEl.duration
+          : undefined;
+      const thumbnailUrl =
+        mediaEl.tagName === 'VIDEO'
+          ? absoluteUrl((mediaEl as HTMLVideoElement).poster) ?? undefined
+          : undefined;
+      results.set(key, {
+        id: key,
+        url: '',
+        pageUrl: location.href,
+        title: document.title || 'Streaming media',
+        sourceDomain: location.hostname,
+        kind: mediaEl.tagName === 'AUDIO' ? 'audio' : 'video',
+        thumbnailUrl,
+        durationSeconds,
+        isProtected: true,
+        protectionReasons: [
+          'This page plays media through a segmented streaming player (MediaSource Extensions) and does not expose a downloadable file.',
+        ],
+        adapterName: 'DirectMediaAdapter',
+      });
+      return;
+    }
     // Two accepted cases:
     //  - http(s) src: a directly-addressable resource candidate.
     //  - blob: src: an MSE (MediaSource Extensions) player — the media is

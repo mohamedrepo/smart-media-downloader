@@ -15,7 +15,12 @@
 
 import type { AppSettings, DownloadTask, MediaFormat, MediaInfo } from '../types';
 import { probeUrl } from '../downloads/download-engine';
-import { sanitizeFilename, subtitleFilename, validateMediaUrl } from '../utils/validation';
+import {
+  originPatternsFor,
+  sanitizeFilename,
+  subtitleFilename,
+  validateMediaUrl,
+} from '../utils/validation';
 import { loadSettings } from '../utils/storage';
 import { Logger } from '../utils/logger';
 import type { QueueManager } from './queue-manager';
@@ -47,9 +52,13 @@ export class DownloadManager {
         'The media URL is missing, invalid, or not publicly accessible.',
       );
     }
-    const granted = await chrome.permissions.contains({
-      origins: [originOf(url)],
-    });
+    const origins = originPatternsFor(url);
+    if (origins.length === 0) {
+      throw new InvalidUrlError(
+        'The media URL is missing, invalid, or not publicly accessible.',
+      );
+    }
+    const granted = await chrome.permissions.contains({ origins });
     if (!granted) {
       throw new AccessDeniedError(
         'Access to this site has not been granted. Click the download button again and allow the permission prompt.',
@@ -80,15 +89,6 @@ export class DownloadManager {
       subtitleLanguages,
       subtitleFormat,
     });
-  }
-}
-
-function originOf(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.host}/*`;
-  } catch {
-    return '*://*/*';
   }
 }
 

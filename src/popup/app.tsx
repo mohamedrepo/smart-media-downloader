@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MediaFormat, SubtitleFormat } from '../types';
+import type { MediaFormat, MediaInfo, SubtitleFormat, SubtitleTrack } from '../types';
 import { findAdapter } from '../adapters/registry';
+import { originPatternsFor } from '../utils/validation';
 import { useQueue } from './hooks/use-queue';
 import { useTabMedia } from './hooks/use-tab-media';
 import { MediaCard } from './components/media-card';
@@ -17,7 +18,7 @@ const CONNECTION_CHOICES = [1, 2, 4, 8, 16] as const;
  * interrupts an active download.
  */
 export default function App(): React.ReactElement {
-  const { media, subtitleTracks, loading, supportedTab, rescan } = useTabMedia();
+  const { media, subtitleTracks, loading, supportedTab, tabUrl, rescan } = useTabMedia();
   const { tasks, progress } = useQueue();
 
   const [formats, setFormats] = useState<MediaFormat[]>([]);
@@ -28,9 +29,19 @@ export default function App(): React.ReactElement {
   const [connections, setConnections] = useState<number>(8);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pageMedia, setPageMedia] = useState<MediaInfo | null>(null);
+  const [adapterTracks, setAdapterTracks] = useState<SubtitleTrack[]>([]);
 
   const primary = media[0];
-  const protectedMedia = primary?.isProtected ?? false;
+  // Page-level adapter fallback: when the page itself is handled by an
+  // adapter (e.g. archive.org item pages) but exposes no DOM media, the
+  // adapter resolves media from the page URL.
+  const activeMedia: MediaInfo | null = primary ?? pageMedia;
+  const protectedMedia = activeMedia?.isProtected ?? false;
+  const allSubtitleTracks = useMemo(
+    () => [...subtitleTracks, ...adapterTracks],
+    [subtitleTracks, adapterTracks],
+  );
 
   // Resolve available formats through the adapter system.
   useEffect(() => {
@@ -73,17 +84,64 @@ export default function App(): React.ReactElement {
     [formats, selectedFormatId],
   );
 
+  // Page-level adapter resolution (runs only when DOM detection found nothing).
+  useEffect(() => {
+    let alive = true;
+    setPageMedia(null);
+    setAdapterTracks([]);
+    if (primary || loading || !supportedTab) return;
+    if (!tabUrl) return;
+    const adapter = findAdapter(tabUrl);
+    if (!adapter || !adapter.canHandle(tabUrl)) return;
+    setFormatsLoading(true);
+    void (async () => {
+      try {
+        const info = await adapter.getMediaInfo(tabUrl);
+        if (!alive) return;
+        setPageMedia(info);
+        if (info.isProtected) return; // notice path — no formats/subtitles offered
+        const list = await adapter.getAvailableFormats(info);
+        if (!alive) return;
+        setFormats(list);
+        setSelectedFormatId(list[0]?.id ?? null);
+        if (adapter.getSubtitleTracks) {
+          const tracks = await adapter.getSubtitleTracks(info);
+          if (alive) setAdapterTracks(tracks);
+        }
+      } catch (err) {
+        if (alive) {
+          setError(
+            `Could not resolve this page's media: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      } finally {
+        if (alive) setFormatsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [primary, loading, supportedTab, tabUrl]);
+
   const startDownload = (): void => {
-    if (!primary || !selectedFormat || busy) return;
+    if (!activeMedia || !selectedFormat || busy) return;
     setBusy(true);
     setError(null);
     void (async () => {
       try {
         // Host permission must be requested from a user gesture (popup).
-        const origin = originPattern(selectedFormat.downloadUrl ?? primary.url);
-        const granted = await chrome.permissions.contains({ origins: [origin] });
+        // Wildcard-subdomain origins are included so CDN/datnode redirect
+        // targets (e.g. archive.org → dn*.ca.archive.org) stay authorized.
+        const origins = originPatternsFor(selectedFormat.downloadUrl ?? activeMedia.url);
+        if (origins.length === 0) {
+          setError('The media URL is invalid or unsupported.');
+          return;
+        }
+        const granted = await chrome.permissions.contains({ origins });
         if (!granted) {
-          const ok = await chrome.permissions.request({ origins: [origin] });
+          const ok = await chrome.permissions.request({ origins });
           if (!ok) {
             setError('Site access is required to download this file.');
             return;
@@ -92,7 +150,7 @@ export default function App(): React.ReactElement {
         await chrome.runtime.sendMessage({
           type: 'ENQUEUE_DOWNLOAD',
           payload: {
-            media: primary,
+            media: activeMedia,
             format: selectedFormat,
             connections,
             subtitleLanguages,
@@ -145,17 +203,17 @@ export default function App(): React.ReactElement {
         <p className="px-4 py-6 text-center text-xs text-slate-500">Scanning page…</p>
       )}
 
-      {supportedTab && !loading && !primary && (
+      {supportedTab && !loading && !activeMedia && (
         <p className="px-4 py-6 text-center text-xs text-slate-500">
           No directly-exposed media found on this page.
         </p>
       )}
 
-      {primary && (
+      {activeMedia && (
         <>
-          <MediaCard media={primary} />
+          <MediaCard media={activeMedia} />
           {protectedMedia ? (
-            <ProtectedNotice media={primary} />
+            <ProtectedNotice media={activeMedia} />
           ) : (
             <>
               <div className="p-4">
@@ -206,7 +264,7 @@ export default function App(): React.ReactElement {
                 )}
               </div>
               <SubtitlePicker
-                tracks={subtitleTracks}
+                tracks={allSubtitleTracks}
                 selected={subtitleLanguages}
                 onToggle={(lang) =>
                   setSubtitleLanguages((prev) =>
@@ -229,13 +287,4 @@ export default function App(): React.ReactElement {
       </footer>
     </div>
   );
-}
-
-function originPattern(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.host}/*`;
-  } catch {
-    return '*://*/*';
-  }
 }

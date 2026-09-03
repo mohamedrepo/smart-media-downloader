@@ -86,6 +86,30 @@ export function isDirectMediaUrl(raw: string): boolean {
 }
 
 /**
+ * Permission origin patterns for a media/page URL.
+ *
+ * Returns the exact origin plus the wildcard-subdomain sibling when one
+ * exists: CDN/datnode redirects (e.g. archive.org → dn*.ca.archive.org) stay
+ * inside the granted set, so service-worker fetches survive redirects.
+ */
+export function originPatternsFor(raw: string): string[] {
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return [];
+    const base = `${parsed.protocol}//${parsed.host}/*`;
+    const host = parsed.hostname;
+    const firstDot = host.indexOf('.');
+    // Single-label hosts (localhost etc.) have nothing to wildcard.
+    if (firstDot <= 0 || firstDot === host.length - 1) return [base];
+    const parent = host.slice(firstDot + 1);
+    const wildcard = `${parsed.protocol}//*.${parent}/*`;
+    return wildcard === base ? [base] : [base, wildcard];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Sanitize an arbitrary string into a safe cross-platform filename.
  * - strips path separators and traversal sequences
  * - removes control characters and Windows-illegal characters

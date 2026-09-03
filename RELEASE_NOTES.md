@@ -1,8 +1,13 @@
-# Smart Media Downloader v1.0.0
+# Smart Media Downloader v1.1.0
 
 Chrome Extension (Manifest V3) for downloading **authorized, directly-exposed** media files with an IDM-style multi-connection engine and subtitle support.
 
-> This extension **never bypasses DRM, encryption, authentication, or platform restrictions**. Protected or non-exposed media (e.g. YouTube's segmented streaming player) is detected and explained — never touched.
+> This extension **never bypasses DRM, encryption, authentication, or platform restrictions**. Protected or non-exposed media (e.g. YouTube's segmented streaming player, lending-restricted archive.org items) is detected and explained — never touched.
+
+## What's new in v1.1.0
+
+- **Internet Archive adapter** — open any `archive.org/details/…` item page and the extension resolves the item's media files via archive.org's documented public metadata API and offers them through the platform's own `/download/` endpoints. Access-restricted (lending) items are refused with an explanation. Subtitle/caption files (`.vtt`/`.srt`) listed by the item are offered too.
+- **Page-level adapter routing** — when a page exposes no DOM media but is handled by an adapter, the popup resolves media from the page URL itself.
 
 ## Install
 

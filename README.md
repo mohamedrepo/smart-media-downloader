@@ -9,6 +9,7 @@ A Chrome Extension (Manifest V3) for downloading media **only** from sources whe
 | Media type | Supported | Why |
 |---|---|---|
 | Direct media files (`.mp4`, `.webm`, `.mov`, `.mkv`, `.mp3`, `.m4a`, …) | ✅ | The site serves the file to the browser as an ordinary HTTP(S) resource — by definition authorized for direct retrieval. |
+| Internet Archive item pages (`archive.org/details/…`) | ✅ | Resolved via archive.org's documented public metadata API and its **official** `/download/` endpoints. Access-restricted (lending) items are refused with an explanation. |
 | Page-exposed subtitle tracks (`<track>` elements) | ✅ | Officially exposed to the browser; WebVTT → SRT conversion is done locally. |
 | MSE/segmented streaming players (YouTube, most modern players — `blob:` video sources) | ❌ | No file is exposed; streams are assembled in-memory from segments. The popup explains this instead of offering a download. Extracting stream URLs would mean circumventing platform restrictions. |
 | Platform/DRM-protected streams (Widevine/EME, encrypted HLS/DASH) | ❌ | Never. The extension detects EME usage and shows a notice instead. |

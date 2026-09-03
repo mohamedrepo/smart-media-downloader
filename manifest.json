@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Media Downloader",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Downloads only authorized, directly-exposed media files with multi-connection acceleration and subtitle support. Never bypasses DRM or access controls.",
   "minimum_chrome_version": "110",
   "icons": {

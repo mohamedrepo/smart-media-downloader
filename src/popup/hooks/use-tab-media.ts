@@ -19,6 +19,7 @@ export function useTabMedia(): {
   emeDetected: boolean;
   loading: boolean;
   supportedTab: boolean;
+  tabUrl: string;
   rescan: () => void;
 } {
   const [state, setState] = useState<DetectionResult>({
@@ -28,6 +29,7 @@ export function useTabMedia(): {
   });
   const [loading, setLoading] = useState(true);
   const [supportedTab, setSupportedTab] = useState(true);
+  const [tabUrl, setTabUrl] = useState('');
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function useTabMedia(): {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!alive) return;
         const url = tab?.url ?? '';
+        setTabUrl(url);
         const injectable =
           url.startsWith('http://') || url.startsWith('https://');
         if (!injectable || tab?.id === undefined) {
@@ -77,6 +80,7 @@ export function useTabMedia(): {
     emeDetected: state.detectedEme,
     loading,
     supportedTab,
+    tabUrl,
     rescan,
   };
 }

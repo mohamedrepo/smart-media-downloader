@@ -63,26 +63,27 @@ export async function mergeAndDownload(
   }
 }
 
-/** Single-stream (no Range support) download path. */
+/**
+ * Single-stream (no Range support) download path.
+ *
+ * Hands the ORIGINAL URL directly to the browser's downloader: it is not
+ * restricted by extension host permissions, follows redirects (CDN/datnode
+ * hops) natively, and streams to disk — exactly what clicking the link in
+ * a browser tab would do. No extension fetch, no memory churn.
+ */
 export async function streamAndDownload(
   task: DownloadTask,
   overwriteExisting: boolean,
 ): Promise<MergeResult> {
-  const res = await fetch(task.url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} while fetching the file.`);
-  if (!res.body) throw new Error('Empty response body.');
-  const blob = await res.blob(); // streamed & file-backed by the browser
-  const blobUrl = URL.createObjectURL(blob);
   try {
     const downloadId = await chrome.downloads.download({
-      url: blobUrl,
+      url: task.url,
       filename: joinDownloadFolder(task),
       conflictAction: overwriteExisting ? 'overwrite' : 'uniquify',
     });
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10 * 60 * 1000);
+    log.info('browser download started (single stream)', task.filename, 'id', downloadId);
     return { downloadId };
   } catch (err) {
-    URL.revokeObjectURL(blobUrl);
     throw new Error(
       `Could not hand the file to the browser downloader: ${
         err instanceof Error ? err.message : String(err)

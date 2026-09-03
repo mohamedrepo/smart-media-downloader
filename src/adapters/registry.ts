@@ -9,10 +9,13 @@
 
 import type { MediaProviderAdapter } from './provider-adapter-interface';
 import { DirectMediaAdapter } from './direct-media-adapter';
+import { InternetArchiveAdapter } from './internet-archive-adapter';
 
 const registry: MediaProviderAdapter[] = [
-  // Future authorized-provider adapters register ABOVE the direct adapter:
-  // e.g. new OfficialSiteAdapter(),  // documented download API only
+  // Authorized-provider adapters register ABOVE the direct adapter.
+  // Internet Archive: documented public metadata API + official /download/
+  // endpoints; access-restricted lending items are refused.
+  new InternetArchiveAdapter(),
   new DirectMediaAdapter(),
 ];
 

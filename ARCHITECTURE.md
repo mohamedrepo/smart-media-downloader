@@ -3,7 +3,7 @@
 ## Module map
 
 ```text
-┌────────────────────────── extension pages ──────────────────────────┐
+┌────────────────────────────────── extension pages ──────────────────────────┐
 │  popup/ (React)                       options/ (React)              │
 │   ├─ hooks/use-tab-media.ts            └─ options-page.tsx           │
 │   ├─ hooks/use-queue.ts                   (chrome.storage wrapper)   │
@@ -28,7 +28,10 @@
 │  │ adapters/ (provider abstraction)                       │          │
 │  │  ├─ provider-adapter-interface.ts (contract)           │          │
 │  │  ├─ registry.ts (routing)                              │          │
-│  │  └─ direct-media-adapter.ts (direct files)             │          │
+│  │  ├─ direct-media-adapter.ts (plain file URLs)          │          │
+│  │  └─ internet-archive-adapter.ts (documented API +      │          │
+│  │      official /download/ endpoints; restricted items   │          │
+│  │      flagged protected)                                │          │
 │  └───────────────────────────────────────────────────────┘          │
 │  ┌───────────────────────────────────────────────────────┐          │
 │  │ subtitles/ (track download + vtt→srt + language utils) │          │
@@ -43,7 +46,7 @@
 ## Data flow (download)
 
 1. **Detect** — content script scans the DOM on load (and on popup request via `GET_MEDIA`), producing `MediaInfo[]` + `SubtitleTrack[]`. EME usage ⇒ `isProtected: true` with reasons.
-2. **Resolve** — popup asks the adapter registry for formats (`getAvailableFormats`); for direct files this is a HEAD probe (Content-Length, Accept-Ranges).
+2. **Resolve** — popup asks the adapter registry for formats (`getAvailableFormats`); for direct files this is a HEAD probe (Content-Length, Accept-Ranges). When DOM detection finds nothing, the popup additionally routes the **page URL** itself through the registry, so page-level adapters (e.g. Internet Archive item pages) can resolve media.
 3. **Authorize** — on Download click, the popup requests per-origin host permission (user gesture) and sends `ENQUEUE_DOWNLOAD`.
 4. **Gate & plan** — background re-validates URL + protection flag, probes the URL, plans byte-range chunks (`planChunks`) or marks single-stream fallback.
 5. **Persist** — the task (with chunk states) is written to IndexedDB **before** activation.

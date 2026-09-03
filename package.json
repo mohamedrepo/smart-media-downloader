@@ -1,6 +1,6 @@
 {
   "name": "smart-media-downloader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Chrome MV3 extension for downloading authorized, directly-exposed media files with multi-connection acceleration and subtitle support. No DRM circumvention.",

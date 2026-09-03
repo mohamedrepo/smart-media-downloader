@@ -62,7 +62,7 @@ function collectFromMediaTags(): MediaInfo[] {
       const active =
         !mediaEl.paused ||
         mediaEl.currentTime > 0 ||
-        mediaEl.readyState >= 3 ||
+        mediaEl.readyState >= 1 || // metadata loaded (covers paused/never-started players)
         (mediaEl.duration !== undefined &&
           Number.isFinite(mediaEl.duration) &&
           mediaEl.duration > 0);
